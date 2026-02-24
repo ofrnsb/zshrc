@@ -62,14 +62,14 @@ Command | Description
 `stop_postgreSql_Server` | Stop PostgreSQL service.
 `dbdump` | Dump a Postgres or MySQL database to a file.
 `dbrestore` | Restore a Postgres or MySQL database from a file.
-`gitc` | Interactive git command center.
+`dbc` | Interactive database command center.
+`gitc` | Interactive git command center (includes clean merged branches).
 `gpl` | `gitc pull`.
 `gpo` | `gitc push`.
 `gg` | `git_acp` (add/commit/push).
 `gcs` | Clone repo and optionally set git user for personal GitHub.
 `gco` | Interactive branch checkout or creation.
 `git_acp` | Initialize repo (if needed), add/commit/push, and create GitHub repo.
-`gitclean` | Delete merged local branches (safe prompt).
 `vsp` | Publish VSCode extension via `vsce`.
 `ca` | Create app templates (`an`, `ne`, `vu`).
 `npmc` | Interactive npm command center.
@@ -83,8 +83,6 @@ Command | Description
 `del` | Remove a folder.
 `kafkac` | Interactive Kafka command center.
 `ka` | Alias to `kafkac`.
-`dockerps` | List running Docker containers (table format).
-`dockerkill` | Stop and remove a running Docker container.
 `dockerc` | Interactive Docker command center.
 `dkr` | Alias to `dockerc`.
 `hide` | Hide file or folder (macOS).

@@ -271,6 +271,59 @@ function stop_postgreSql_Server() {
   brew services stop postgresql@16
 }
 
+dbc() {
+  local action="${1:-}"
+  if [[ -z "$action" ]]; then
+    echo "DB command:"
+    echo "1) mysql start"
+    echo "2) mysql stop"
+    echo "3) postgres start"
+    echo "4) postgres stop"
+    echo "5) dump"
+    echo "6) restore"
+    read -k -s action
+    echo ""
+  else
+    shift
+  fi
+
+  case "$action" in
+    1|ms|mysql-start)
+      run_mySql_Server
+      ;;
+    2|mS|mysql-stop)
+      stop_mySql_Server
+      ;;
+    3|ps|postgres-start)
+      run_postgreSql_Server
+      ;;
+    4|pS|postgres-stop)
+      stop_postgreSql_Server
+      ;;
+    5|dump)
+      local engine="${1:-}"
+      local db="${2:-}"
+      local out="${3:-}"
+      [[ -z "$engine" ]] && read -r "engine?Engine (pg/mysql): "
+      [[ -z "$db" ]] && read -r "db?Database: "
+      [[ -z "$out" ]] && read -r "out?Output file: "
+      dbdump "$engine" "$db" "$out"
+      ;;
+    6|restore)
+      local engine="${1:-}"
+      local db="${2:-}"
+      local infile="${3:-}"
+      [[ -z "$engine" ]] && read -r "engine?Engine (pg/mysql): "
+      [[ -z "$db" ]] && read -r "db?Database: "
+      [[ -z "$infile" ]] && read -r "infile?Input file: "
+      dbrestore "$engine" "$db" "$infile"
+      ;;
+    *)
+      echo "Unknown action."
+      ;;
+  esac
+}
+
 dbdump() {
   local engine="$1"
   local db="$2"
@@ -508,6 +561,7 @@ gitc() {
     echo "7) add+commit+push"
     echo "8) log"
     echo "9) sync (pull+push)"
+    echo "0) clean merged branches"
     read -k -s action
     echo ""
   fi
@@ -582,6 +636,32 @@ gitc() {
         gitc push
       fi
       ;;
+    0|clean)
+      git fetch --prune >/dev/null 2>&1
+      local branches=($(git branch --merged | sed 's/^[* ]*//' | grep -vE '^(main|master|develop)$'))
+
+      if [[ ${#branches[@]} -eq 0 ]]; then
+        echo "No merged branches to delete."
+        return 0
+      fi
+
+      echo "Delete merged branches?"
+      display_available "branches" "${branches[@]}"
+      read -k -s reply
+      echo ""
+
+      if [[ "$reply" =~ ^[Qq]$ ]]; then
+        echo "Exit."
+        return 0
+      fi
+
+      if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#branches[@]} )); then
+        git branch -d "${branches[$reply]}"
+      else
+        echo "Invalid selection."
+        return 1
+      fi
+      ;;
     *)
       echo "Unknown action."
       ;;
@@ -637,38 +717,6 @@ display_available() {
     echo "$i) $b"
     ((i++))
   done
-}
-
-gitclean() {
-  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    echo "Not a git repository."
-    return 1
-  fi
-
-  git fetch --prune >/dev/null 2>&1
-  local branches=($(git branch --merged | sed 's/^[* ]*//' | grep -vE '^(main|master|develop)$'))
-
-  if [[ ${#branches[@]} -eq 0 ]]; then
-    echo "No merged branches to delete."
-    return 0
-  fi
-
-  echo "Delete merged branches?"
-  display_available "branches" "${branches[@]}"
-  read -k -s reply
-  echo ""
-
-  if [[ "$reply" =~ ^[Qq]$ ]]; then
-    echo "Exit."
-    return 0
-  fi
-
-  if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#branches[@]} )); then
-    git branch -d "${branches[$reply]}"
-  else
-    echo "Invalid selection."
-    return 1
-  fi
 }
 
 gco() {
@@ -1418,35 +1466,11 @@ kafkac(){
 ka(){ kafkac "$@"; }
 
 # Docker
-dockerps() {
-  docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
-}
-
-dockerkill() {
-  local containers=($(docker ps --format '{{.Names}}'))
-  if [[ ${#containers[@]} -eq 0 ]]; then
-    echo "No running containers."
-    return 0
-  fi
-
-  echo "Select container to stop and remove:"
-  display_available_topics "${containers[@]}"
-  read -k -s reply
-  echo ""
-  if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#containers[@]} )); then
-    local selected="${containers[$reply]}"
-    docker stop "$selected" && docker rm "$selected"
-  else
-    echo "Invalid selection."
-    return 1
-  fi
-}
-
 dockerc(){
 
-  PS3="What to run?
+  PS3="What to run? 
   1.Docker Build  2.Docker Run  3.Compose Up
-  4.Compose Down  5.Docker Bash 6.Docker Stop"
+  4.Compose Down  5.Docker Bash 6.List Containers 7.Docker Stop"
   if [[ -z "$1" ]]; then
     echo "$PS3"
     read -k -s REPLY
@@ -1491,21 +1515,30 @@ dockerc(){
       return
     fi
 
-    elif [[ "$REPLY" == "6" ]]; then
-    allImages=($(docker images | grep -v "REPOSITORY" | awk '{print $1}'))
-    echo "Select Image:"
-    display_available_topics "${allImages[@]}"
-    read -k -s ImageName
-    if [[ "$ImageName" =~ ^[0-9]+$ ]] && (( ImageName >= 1 && ImageName <= ${#allImages[@]} )); then
-      local selectedImage=${allImages[$ImageName]}
-      docker stop "$selectedImage" && docker rm "$selectedImage"
+  elif [[ "$REPLY" == "6" ]]; then
+    docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+  elif [[ "$REPLY" == "7" ]]; then
+    local containers=($(docker ps --format '{{.Names}}'))
+    if [[ ${#containers[@]} -eq 0 ]]; then
+      echo "No running containers."
+      return 0
+    fi
+
+    echo "Select container to stop and remove:"
+    display_available_topics "${containers[@]}"
+    read -k -s reply
+    echo ""
+    if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#containers[@]} )); then
+      local selected="${containers[$reply]}"
+      docker stop "$selected" && docker rm "$selected"
     else
       echo "Invalid input"
-      return
+      return 1
     fi
 
   else
-    echo "Invalid input"
+    echo "Invalid input" 
     return
   fi
 }
