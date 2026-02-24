@@ -271,6 +271,54 @@ function stop_postgreSql_Server() {
   brew services stop postgresql@16
 }
 
+dbdump() {
+  local engine="$1"
+  local db="$2"
+  local out="$3"
+
+  if [[ -z "$engine" || -z "$db" || -z "$out" ]]; then
+    echo "Usage: dbdump pg|mysql <db> <out.sql>"
+    return 1
+  fi
+
+  case "$engine" in
+    pg|postgres)
+      pg_dump "$db" > "$out"
+      ;;
+    mysql)
+      mysqldump "$db" > "$out"
+      ;;
+    *)
+      echo "Unknown database engine: $engine"
+      return 1
+      ;;
+  esac
+}
+
+dbrestore() {
+  local engine="$1"
+  local db="$2"
+  local infile="$3"
+
+  if [[ -z "$engine" || -z "$db" || -z "$infile" ]]; then
+    echo "Usage: dbrestore pg|mysql <db> <in.sql>"
+    return 1
+  fi
+
+  case "$engine" in
+    pg|postgres)
+      psql "$db" < "$infile"
+      ;;
+    mysql)
+      mysql "$db" < "$infile"
+      ;;
+    *)
+      echo "Unknown database engine: $engine"
+      return 1
+      ;;
+  esac
+}
+
 # Project Runner
 runs() {
   if [ -f package.json ]; then
@@ -590,6 +638,39 @@ display_available() {
     ((i++))
   done
 }
+
+gitclean() {
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    echo "Not a git repository."
+    return 1
+  fi
+
+  git fetch --prune >/dev/null 2>&1
+  local branches=($(git branch --merged | sed 's/^[* ]*//' | grep -vE '^(main|master|develop)$'))
+
+  if [[ ${#branches[@]} -eq 0 ]]; then
+    echo "No merged branches to delete."
+    return 0
+  fi
+
+  echo "Delete merged branches?"
+  display_available "branches" "${branches[@]}"
+  read -k -s reply
+  echo ""
+
+  if [[ "$reply" =~ ^[Qq]$ ]]; then
+    echo "Exit."
+    return 0
+  fi
+
+  if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#branches[@]} )); then
+    git branch -d "${branches[$reply]}"
+  else
+    echo "Invalid selection."
+    return 1
+  fi
+}
+
 gco() {
   # Ensure we're inside a Git repository
   if ! git rev-parse --is-inside-work-tree &>/dev/null; then
@@ -934,6 +1015,155 @@ ca() {
   fi
 }
 
+npmc() {
+  local action="${1:-}"
+  if [[ -z "$action" ]]; then
+    echo "NPM command:"
+    echo "1) install"
+    echo "2) test"
+    echo "3) lint"
+    echo "4) build"
+    echo "5) dev"
+    read -k -s action
+    echo ""
+  fi
+
+  case "$action" in
+    1|i|install) npm install ;;
+    2|t|test) npm test ;;
+    3|l|lint) npm run lint ;;
+    4|b|build) npm run build ;;
+    5|d|dev) npm run dev ;;
+    *) echo "Unknown action." ;;
+  esac
+}
+
+yarnc() {
+  local action="${1:-}"
+  if [[ -z "$action" ]]; then
+    echo "Yarn command:"
+    echo "1) install"
+    echo "2) test"
+    echo "3) lint"
+    echo "4) build"
+    echo "5) dev"
+    read -k -s action
+    echo ""
+  fi
+
+  case "$action" in
+    1|i|install) yarn install ;;
+    2|t|test) yarn test ;;
+    3|l|lint) yarn lint ;;
+    4|b|build) yarn build ;;
+    5|d|dev) yarn dev ;;
+    *) echo "Unknown action." ;;
+  esac
+}
+
+# Infra
+tfc() {
+  if ! command -v terraform >/dev/null 2>&1; then
+    echo "terraform not found."
+    return 1
+  fi
+
+  local action="${1:-}"
+  if [[ -z "$action" ]]; then
+    echo "Terraform command:"
+    echo "1) init"
+    echo "2) plan"
+    echo "3) apply"
+    echo "4) destroy"
+    echo "5) fmt"
+    read -k -s action
+    echo ""
+  else
+    shift
+  fi
+
+  case "$action" in
+    1|i|init) terraform init "$@" ;;
+    2|p|plan) terraform plan "$@" ;;
+    3|a|apply) terraform apply "$@" ;;
+    4|d|destroy) terraform destroy "$@" ;;
+    5|f|fmt) terraform fmt "$@" ;;
+    *) echo "Unknown action." ;;
+  esac
+}
+
+k8sc() {
+  if ! command -v kubectl >/dev/null 2>&1; then
+    echo "kubectl not found."
+    return 1
+  fi
+
+  local action="${1:-}"
+  if [[ -z "$action" ]]; then
+    echo "K8s command:"
+    echo "1) contexts"
+    echo "2) use context"
+    echo "3) namespaces"
+    echo "4) set namespace"
+    echo "5) pods"
+    echo "6) services"
+    read -k -s action
+    echo ""
+  else
+    shift
+  fi
+
+  case "$action" in
+    1|ctx|contexts)
+      kubectl config get-contexts
+      ;;
+    2|use)
+      local contexts=($(kubectl config get-contexts -o name))
+      if [[ ${#contexts[@]} -eq 0 ]]; then
+        echo "No contexts found."
+        return 1
+      fi
+      display_available "contexts" "${contexts[@]}"
+      read -k -s reply
+      echo ""
+      if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#contexts[@]} )); then
+        kubectl config use-context "${contexts[$reply]}"
+      else
+        echo "Invalid selection."
+        return 1
+      fi
+      ;;
+    3|ns|namespaces)
+      kubectl get ns
+      ;;
+    4|setns)
+      local namespaces=($(kubectl get ns -o jsonpath='{.items[*].metadata.name}'))
+      if [[ ${#namespaces[@]} -eq 0 ]]; then
+        echo "No namespaces found."
+        return 1
+      fi
+      display_available "namespaces" "${namespaces[@]}"
+      read -k -s reply
+      echo ""
+      if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#namespaces[@]} )); then
+        kubectl config set-context --current --namespace="${namespaces[$reply]}"
+      else
+        echo "Invalid selection."
+        return 1
+      fi
+      ;;
+    5|pods)
+      kubectl get pods -A
+      ;;
+    6|svc|services)
+      kubectl get svc -A
+      ;;
+    *)
+      echo "Unknown action."
+      ;;
+  esac
+}
+
 sz() {
   source ~/.zshrc
 }
@@ -1188,6 +1418,30 @@ kafkac(){
 ka(){ kafkac "$@"; }
 
 # Docker
+dockerps() {
+  docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+}
+
+dockerkill() {
+  local containers=($(docker ps --format '{{.Names}}'))
+  if [[ ${#containers[@]} -eq 0 ]]; then
+    echo "No running containers."
+    return 0
+  fi
+
+  echo "Select container to stop and remove:"
+  display_available_topics "${containers[@]}"
+  read -k -s reply
+  echo ""
+  if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#containers[@]} )); then
+    local selected="${containers[$reply]}"
+    docker stop "$selected" && docker rm "$selected"
+  else
+    echo "Invalid selection."
+    return 1
+  fi
+}
+
 dockerc(){
 
   PS3="What to run?
