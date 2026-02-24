@@ -719,6 +719,69 @@ display_available() {
   done
 }
 
+zf() {
+  local zshrc_path="${ZSHRC_PUBLIC_PATH:-$HOME/.zshrc}"
+  if [[ ! -f "$zshrc_path" ]]; then
+    echo "zshrc not found: $zshrc_path"
+    return 1
+  fi
+
+  local funcs=($(awk '
+    /^[[:space:]]*function[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/ {
+      line=$0
+      sub(/^[[:space:]]*function[[:space:]]+/, "", line)
+      sub(/[[:space:]]*\(.*/, "", line)
+      sub(/[[:space:]]*\{.*/, "", line)
+      print line
+      next
+    }
+    /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/ {
+      line=$0
+      sub(/^[[:space:]]*/, "", line)
+      sub(/[[:space:]]*\(.*/, "", line)
+      print line
+    }
+  ' "$zshrc_path"))
+
+  typeset -U funcs
+
+  if [[ ${#funcs[@]} -eq 0 ]]; then
+    echo "No functions found."
+    return 1
+  fi
+
+  echo "Select function (press Q to exit):"
+  local i=1
+  local list=""
+  for f in "${funcs[@]}"; do
+    list+="$i) $f\n"
+    ((i++))
+  done
+
+  if [[ ${#funcs[@]} -gt 9 ]]; then
+    printf "%b" "$list" | column
+    read -r reply
+  else
+    printf "%b" "$list"
+    read -k -s reply
+    echo ""
+  fi
+
+  if [[ "$reply" =~ ^[Qq]$ ]]; then
+    echo "Exit."
+    return 0
+  fi
+
+  if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#funcs[@]} )); then
+    local selected="${funcs[$reply]}"
+    echo "Running: $selected"
+    "$selected"
+  else
+    echo "Invalid selection."
+    return 1
+  fi
+}
+
 gco() {
   # Ensure we're inside a Git repository
   if ! git rev-parse --is-inside-work-tree &>/dev/null; then

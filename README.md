@@ -34,6 +34,7 @@ export ZSHRC_PERSONAL="$HOME/.mac/.zshrc.personal"
 
 **Customizable Environment Variables**
 
+- `ZSHRC_PUBLIC_PATH`: path to the `.zshrc` file for `zf` to scan (defaults to `~/.zshrc`).
 - `ZSHRC_PERSONAL`: path to your personal overrides file.
 - `KAFKA_HOME`: Kafka install directory (required for `kafkac`).
 - `VENV_HOME`: root directory for centralized Python venvs (defaults to `~/.venvs`).
@@ -51,6 +52,7 @@ export ZSHRC_PERSONAL="$HOME/.mac/.zshrc.personal"
 **Commands**
 Command | Description
 --- | ---
+`zf` | List all functions from `.zshrc` and run the selected one.
 `javac` | Interactive Java version switcher (23/17/8).
 `j23`, `j17`, `j8` | Set `JAVA_HOME` for a specific version.
 `ras` | Run Android Emulator (`Pixel`).
