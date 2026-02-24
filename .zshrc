@@ -919,7 +919,7 @@ ZF_PUBLIC_FUNCS=(
   unhide
   ctm
   cl
-  zf
+  
 )
 
 typeset -A ZF_PUBLIC_LABELS

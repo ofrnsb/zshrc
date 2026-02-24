@@ -57,7 +57,7 @@ export ZSHRC_PERSONAL="$HOME/.mac/.zshrc.personal"
 Command | Description
 --- | ---
 `zf` | List public functions with friendly labels and run the selected one.
-`javac` | Java command center: switch installed versions, install, or uninstall via Homebrew.
+`javac` | Java command center: switch installed versions (from `java_home`), install, or uninstall via Homebrew.
 `j23`, `j17`, `j8` | Set `JAVA_HOME` for a specific version.
 `ras` | Run Android Emulator (`Pixel`).
 `cc` | Open VSCode with profile based on project type.
