@@ -952,7 +952,7 @@ ZF_PUBLIC_LABELS=(
   unhide "Unhide File/Folder"
   ctm "Clean Caches"
   cl "Clear Terminal"
-  zf "Zsh Functions"
+  
 )
 
 zf() {
