@@ -3,6 +3,8 @@
 **Overview**
 This repository contains my personal Zsh configuration, tuned for general software engineering use with optional personal customization. Personal secrets and machine-specific settings are loaded from a separate file to keep the repo safe to share.
 
+![Screenshot](image.png)
+
 **Install**
 
 1. Clone this repo.
