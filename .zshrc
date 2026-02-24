@@ -188,28 +188,199 @@ fi
 
 # Java
 # Shortcut to change Java version
-j23() {
-  export JAVA_HOME=$(/usr/libexec/java_home -v 23)
-}
-j17() {
-  export JAVA_HOME=`/usr/libexec/java_home -v 17`
-}
-j8() {
-  export JAVA_HOME=`/usr/libexec/java_home -v 1.8`
+java_use() {
+  local version="$1"
+  local java_home
+  local version_str
+  local major
+  local expected
+  java_home=$(/usr/libexec/java_home -v "$version" 2>/dev/null)
+  if [[ -z "$java_home" || ! -d "$java_home" ]]; then
+    echo "Java $version not found. Installed versions:"
+    /usr/libexec/java_home -V
+    return 1
+  fi
+
+  version_str=$("$java_home/bin/java" -version 2>&1 | awk -F\" 'NR==1{print $2}')
+  if [[ -z "$version_str" ]]; then
+    echo "Unable to read Java version from $java_home."
+    return 1
+  fi
+  if [[ "$version_str" == 1.8* ]]; then
+    major=8
+  else
+    major="${version_str%%.*}"
+  fi
+  if [[ "$version" == "1.8" ]]; then
+    expected=8
+  else
+    expected="$version"
+  fi
+  if [[ "$major" != "$expected" ]]; then
+    echo "Java $version not found. Installed versions:"
+    /usr/libexec/java_home -V
+    return 1
+  fi
+
+  export JAVA_HOME="$java_home"
+  path_prepend "$JAVA_HOME/bin"
+  rehash
 }
 
+java_use_path() {
+  local java_home="$1"
+  if [[ -z "$java_home" || ! -d "$java_home" ]]; then
+    echo "Invalid JAVA_HOME: $java_home"
+    return 1
+  fi
+  export JAVA_HOME="$java_home"
+  path_prepend "$JAVA_HOME/bin"
+  rehash
+}
+
+java_list_installed() {
+  /usr/libexec/java_home -V 2>&1 | awk '/\/Contents\/Home$/ {print $1 "|" $NF}'
+}
+
+j23() { java_use 23; }
+j17() { java_use 17; }
+j8() { java_use 1.8; }
+
 javac() {
-  echo "Select Java version:"
-  echo "1) 23"
-  echo "2) 17"
-  echo "3) 8"
-  read -k -s reply
-  echo ""
-  case "$reply" in
-    1) j23 ;;
-    2) j17 ;;
-    3) j8 ;;
-    *) echo "Invalid selection." ;;
+  local action="${1:-}"
+  if [[ -z "$action" ]]; then
+    echo "Java command:"
+    echo "1) switch"
+    echo "2) install (brew)"
+    echo "3) uninstall (brew)"
+    read -k -s action
+    echo ""
+  fi
+
+  case "$action" in
+    1|s|switch)
+      local entries=("${(@f)$(java_list_installed)}")
+      if [[ ${#entries[@]} -eq 0 ]]; then
+        echo "No Java installations found."
+        return 1
+      fi
+
+      echo "Select Java version (press Q to exit):"
+      local i=1
+      local versions=()
+      local homes=()
+      for entry in "${entries[@]}"; do
+        local ver="${entry%%|*}"
+        local home="${entry#*|}"
+        versions+=("$ver")
+        homes+=("$home")
+        echo "$i) $ver ($home)"
+        ((i++))
+      done
+
+      local reply=""
+      if [[ ${#entries[@]} -gt 9 ]]; then
+        read -r reply
+      else
+        read -k -s reply
+        echo ""
+      fi
+
+      if [[ "$reply" =~ ^[Qq]$ ]]; then
+        echo "Exit."
+        return 0
+      fi
+
+      if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#homes[@]} )); then
+        java_use_path "${homes[$reply]}"
+      else
+        echo "Invalid selection."
+        return 1
+      fi
+      ;;
+    2|i|install)
+      if ! command -v brew >/dev/null 2>&1; then
+        echo "Homebrew not found. Install Homebrew first."
+        return 1
+      fi
+
+      local casks=("${(@f)$(brew search --casks temurin | awk '/^temurin(@[0-9]+)?$/{print $1}')}")
+      if [[ ${#casks[@]} -eq 0 ]]; then
+        echo "No Temurin casks found."
+        return 1
+      fi
+
+      echo "Select Java version to install (press Q to exit):"
+      local i=1
+      for c in "${casks[@]}"; do
+        echo "$i) $c"
+        ((i++))
+      done
+
+      local reply=""
+      if [[ ${#casks[@]} -gt 9 ]]; then
+        read -r reply
+      else
+        read -k -s reply
+        echo ""
+      fi
+
+      if [[ "$reply" =~ ^[Qq]$ ]]; then
+        echo "Exit."
+        return 0
+      fi
+
+      if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#casks[@]} )); then
+        brew install --cask "${casks[$reply]}"
+        /usr/libexec/java_home -V
+      else
+        echo "Invalid selection."
+        return 1
+      fi
+      ;;
+    3|u|uninstall)
+      if ! command -v brew >/dev/null 2>&1; then
+        echo "Homebrew not found. Install Homebrew first."
+        return 1
+      fi
+
+      local casks=("${(@f)$(brew list --cask | awk '/^temurin(@[0-9]+)?$/{print $1}')}")
+      if [[ ${#casks[@]} -eq 0 ]]; then
+        echo "No Temurin casks installed."
+        return 0
+      fi
+
+      echo "Select Java version to uninstall (press Q to exit):"
+      local i=1
+      for c in "${casks[@]}"; do
+        echo "$i) $c"
+        ((i++))
+      done
+
+      local reply=""
+      if [[ ${#casks[@]} -gt 9 ]]; then
+        read -r reply
+      else
+        read -k -s reply
+        echo ""
+      fi
+
+      if [[ "$reply" =~ ^[Qq]$ ]]; then
+        echo "Exit."
+        return 0
+      fi
+
+      if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#casks[@]} )); then
+        brew uninstall --cask "${casks[$reply]}"
+        /usr/libexec/java_home -V
+      else
+        echo "Invalid selection."
+        return 1
+      fi
+      ;;
+    *)
+      echo "Invalid selection."
+      ;;
   esac
 }
 
@@ -1793,65 +1964,35 @@ inre(){
 
 # Setup
 setup_java() {
-  echo "Setting up Java..."
+  echo "Setting up Java with Homebrew (Temurin)..."
 
-  # Define versions and their URLs
-  JAVA_VERSIONS=(
-    "23 https://download.oracle.com/java/23/latest/jdk-23_macos-aarch64_bin.tar.gz"
-    "17 https://download.oracle.com/java/17/archive/jdk-17.0.12_macos-aarch64_bin.tar.gz"
-  )
-
-  INSTALL_DIR="/Library/Java/JavaVirtualMachines"
-  TEMP_DIR="/tmp/jdk-install"
-
-  # Ensure sudo privileges
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "This script needs to run with sudo privileges."
-    echo "Please enter your password to continue."
+  if ! command -v brew >/dev/null 2>&1; then
+    echo "Homebrew not found. Install Homebrew first."
+    return 1
   fi
 
-  for entry in "${JAVA_VERSIONS[@]}"; do
-    # Extract version and URL
-    version=$(echo $entry | cut -d ' ' -f 1)
-    URL=$(echo $entry | cut -d ' ' -f 2)
-    DEST_DIR="${INSTALL_DIR}/jdk-${version}.jdk"
+  local casks=(
+    "temurin@23:23"
+    "temurin@17:17"
+  )
 
-    # Skip if already installed
-    if [ -d "$DEST_DIR" ]; then
-      echo "Java $version is already installed at $DEST_DIR."
+  local entry cask version
+  for entry in "${casks[@]}"; do
+    cask="${entry%%:*}"
+    version="${entry##*:}"
+
+    if brew list --cask "$cask" >/dev/null 2>&1; then
+      echo "Java $version already installed ($cask)."
       continue
     fi
 
-    # Create temporary directory
-    mkdir -p "$TEMP_DIR"
-
-    # Download JDK tarball
-    echo "Downloading Java $version from $URL..."
-    curl -L -o "$TEMP_DIR/jdk-${version}.tar.gz" "$URL"
-
-    # Extract tarball
-    echo "Extracting Java $version..."
-    tar -xzf "$TEMP_DIR/jdk-${version}.tar.gz" -C "$TEMP_DIR"
-
-    # Locate the extracted `.jdk` directory
-    EXTRACTED_DIR=$(find "$TEMP_DIR" -type d -name "jdk-*.jdk" | head -n 1)
-
-    # Check if the extracted directory exists
-    if [ -z "$EXTRACTED_DIR" ]; then
-      echo "Error: Unable to find the extracted .jdk directory for Java $version."
-      continue
+    echo "Installing Java $version ($cask)..."
+    if ! brew install --cask "$cask"; then
+      echo "Failed to install $cask."
     fi
-
-    # Move and rename to the correct directory
-    echo "Moving Java $version to $DEST_DIR..."
-    sudo mv "$EXTRACTED_DIR" "$DEST_DIR"
-
-    echo "Java $version installed successfully at $DEST_DIR."
   done
 
-  # Clean up temporary files
-  rm -rf "$TEMP_DIR"
-  echo "All Java versions are set up!"
+  /usr/libexec/java_home -V
 }
 
 # Function to download and extract Android command-line tools

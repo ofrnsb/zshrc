@@ -57,7 +57,7 @@ export ZSHRC_PERSONAL="$HOME/.mac/.zshrc.personal"
 Command | Description
 --- | ---
 `zf` | List public functions with friendly labels and run the selected one.
-`javac` | Interactive Java version switcher (23/17/8).
+`javac` | Java command center: switch installed versions, install, or uninstall via Homebrew.
 `j23`, `j17`, `j8` | Set `JAVA_HOME` for a specific version.
 `ras` | Run Android Emulator (`Pixel`).
 `cc` | Open VSCode with profile based on project type.
@@ -101,7 +101,7 @@ Command | Description
 `sre` | Start Redis and open CLI.
 `ssre` | Stop Redis.
 `inre` | Redis service info.
-`setup_java` | Install Java 23 and 17 (Oracle tarballs).
+`setup_java` | Install Java 23 and 17 via Homebrew (Temurin casks).
 `setup_android` | Install Android command-line tools.
 
 **Notes**
