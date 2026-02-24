@@ -41,6 +41,10 @@ export ZSHRC_PERSONAL="$HOME/.mac/.zshrc.personal"
 - `GIT_PROFILE_PERSONAL_USER`: GitHub username for `gcs` auto profile configuration.
 - `GIT_PROFILE_PERSONAL_EMAIL`: Git email for `gcs` auto profile configuration.
 
+**Customizable Function List**
+- `ZF_PUBLIC_FUNCS`: array of functions shown by `zf`. Override it in `~/.zshrc.personal` to change the menu.
+- `ZF_PUBLIC_LABELS`: map of function name to label shown in `zf`. Override it in `~/.zshrc.personal` for friendlier names.
+
 **Highlights**
 
 - Custom prompt with git-aware display and tab title updates.
@@ -52,7 +56,7 @@ export ZSHRC_PERSONAL="$HOME/.mac/.zshrc.personal"
 **Commands**
 Command | Description
 --- | ---
-`zf` | List all functions from `.zshrc` and run the selected one.
+`zf` | List public functions with friendly labels and run the selected one.
 `javac` | Interactive Java version switcher (23/17/8).
 `j23`, `j17`, `j8` | Set `JAVA_HOME` for a specific version.
 `ras` | Run Android Emulator (`Pixel`).

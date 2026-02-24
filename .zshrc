@@ -719,6 +719,71 @@ display_available() {
   done
 }
 
+ZF_PUBLIC_FUNCS=(
+  javac
+  ras
+  cc
+  runs
+  gitc
+  vsp
+  ca
+  npmc
+  yarnc
+  tfc
+  k8sc
+  dbc
+  kafkac
+  dockerc
+  redisc
+  pvenv
+  pysetup
+  setup_java
+  setup_android
+  sz
+  op
+  ee
+  kp
+  del
+  hide
+  unhide
+  ctm
+  cl
+  zf
+)
+
+typeset -A ZF_PUBLIC_LABELS
+ZF_PUBLIC_LABELS=(
+  javac "Java Switcher"
+  ras "Run Emulator"
+  cc "Open in VSCode"
+  runs "Run Project"
+  gitc "Git"
+  vsp "VSCode Publish"
+  ca "Create App"
+  npmc "NPM"
+  yarnc "Yarn"
+  tfc "Terraform"
+  k8sc "Kubernetes"
+  dbc "Database"
+  kafkac "Kafka"
+  dockerc "Docker"
+  redisc "Redis"
+  pvenv "Python Venv"
+  pysetup "Python Setup"
+  setup_java "Java Setup"
+  setup_android "Android Setup"
+  sz "Reload Zsh"
+  op "Open Finder"
+  ee "Exit Terminal"
+  kp "Kill Port"
+  del "Delete Folder"
+  hide "Hide File/Folder"
+  unhide "Unhide File/Folder"
+  ctm "Clean Caches"
+  cl "Clear Terminal"
+  zf "Zsh Functions"
+)
+
 zf() {
   local zshrc_path="${ZSHRC_PUBLIC_PATH:-$HOME/.zshrc}"
   if [[ ! -f "$zshrc_path" ]]; then
@@ -726,24 +791,37 @@ zf() {
     return 1
   fi
 
-  local funcs=($(awk '
-    /^[[:space:]]*function[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/ {
-      line=$0
-      sub(/^[[:space:]]*function[[:space:]]+/, "", line)
-      sub(/[[:space:]]*\(.*/, "", line)
-      sub(/[[:space:]]*\{.*/, "", line)
-      print line
-      next
-    }
-    /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/ {
-      line=$0
-      sub(/^[[:space:]]*/, "", line)
-      sub(/[[:space:]]*\(.*/, "", line)
-      print line
-    }
-  ' "$zshrc_path"))
+  local funcs=()
+  if (( ${#ZF_PUBLIC_FUNCS[@]} > 0 )); then
+    funcs=("${ZF_PUBLIC_FUNCS[@]}")
+  else
+    funcs=($(awk '
+      /^[[:space:]]*function[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/ {
+        line=$0
+        sub(/^[[:space:]]*function[[:space:]]+/, "", line)
+        sub(/[[:space:]]*\(.*/, "", line)
+        sub(/[[:space:]]*\{.*/, "", line)
+        print line
+        next
+      }
+      /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/ {
+        line=$0
+        sub(/^[[:space:]]*/, "", line)
+        sub(/[[:space:]]*\(.*/, "", line)
+        print line
+      }
+    ' "$zshrc_path"))
+    typeset -U funcs
+  fi
 
-  typeset -U funcs
+  local available=()
+  local f
+  for f in "${funcs[@]}"; do
+    if typeset -f "$f" >/dev/null 2>&1; then
+      available+=("$f")
+    fi
+  done
+  funcs=("${available[@]}")
 
   if [[ ${#funcs[@]} -eq 0 ]]; then
     echo "No functions found."
@@ -753,8 +831,11 @@ zf() {
   echo "Select function (press Q to exit):"
   local i=1
   local list=""
+  local labels=()
   for f in "${funcs[@]}"; do
-    list+="$i) $f\n"
+    local label="${ZF_PUBLIC_LABELS[$f]:-$f}"
+    labels+=("$label")
+    list+="$i) $label\n"
     ((i++))
   done
 
@@ -774,7 +855,8 @@ zf() {
 
   if [[ "$reply" =~ ^[0-9]+$ ]] && (( reply >= 1 && reply <= ${#funcs[@]} )); then
     local selected="${funcs[$reply]}"
-    echo "Running: $selected"
+    local selected_label="${labels[$reply]}"
+    echo "Running: $selected_label"
     "$selected"
   else
     echo "Invalid selection."
